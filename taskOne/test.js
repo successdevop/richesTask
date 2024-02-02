@@ -3,7 +3,7 @@ const fs = require("fs");
 getCurrentFilenames();
 
 // Rename the file
-fs.rename("initialName.txt", "newFile.txt", () => {
+fs.rename("world.txt", "newFile.txt", () => {
   console.log("\nFile Renamed!\n");
   // List all the filenames after renaming
   getCurrentFilenames();
