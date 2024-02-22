@@ -2,10 +2,11 @@ const fs = require("fs");
 const asyncWrapper = require("../middlewares/asynWrappers");
 const { customError } = require("../error/errorClass");
 
+// get all books
 const getAllBooks = asyncWrapper((req, res, next) => {
   fs.readFile("./database.json", "utf8", (err, json) => {
     if (err) {
-      next(customError(err, 400));
+      next(customError(err, 500));
       return;
     }
 
@@ -21,6 +22,7 @@ const getAllBooks = asyncWrapper((req, res, next) => {
   });
 });
 
+// post/create a new book
 const createABook = asyncWrapper((req, res, next) => {
   const { bookName, bookAuthor } = req.body;
   if (!bookName || !bookAuthor) {
@@ -41,14 +43,14 @@ const createABook = asyncWrapper((req, res, next) => {
 
   fs.readFile("./database.json", "utf8", (err, data) => {
     if (err) {
-      next(customError(err, 400));
+      next(customError(err, 500));
       return;
     }
 
     const dataDB = [...JSON.parse(data), newData];
     fs.writeFile("./database.json", JSON.stringify(dataDB), (err) => {
       if (err) {
-        next(customError("Error writing file", 400));
+        next(customError("Error writing file", 500));
         return;
       }
 
@@ -61,6 +63,7 @@ const createABook = asyncWrapper((req, res, next) => {
   });
 });
 
+// get a single book by id
 const getSingleBook = asyncWrapper((req, res, next) => {
   const { id } = req.params;
   fs.readFile("./database.json", "utf8", (err, data) => {
@@ -69,7 +72,7 @@ const getSingleBook = asyncWrapper((req, res, next) => {
       return;
     }
 
-    const book = JSON.parse(data).find((bk) => bk.id == id);
+    const book = JSON.parse(data).find((bk) => bk.id === id);
 
     if (!book) {
       next(customError(`Book with id (${id}) does not exist!!!`, 400));
@@ -80,6 +83,7 @@ const getSingleBook = asyncWrapper((req, res, next) => {
   });
 });
 
+// update a single book by id
 const updateABook = asyncWrapper((req, res, next) => {
   const { id } = req.params;
   const { bookName, bookAuthor } = req.body;
@@ -90,7 +94,7 @@ const updateABook = asyncWrapper((req, res, next) => {
 
   fs.readFile("./database.json", "utf8", (err, data) => {
     if (err) {
-      next(customError(err, 400));
+      next(customError(err, 500));
       return;
     }
     const book = JSON.parse(data).find((bk) => bk.id === id);
@@ -98,12 +102,21 @@ const updateABook = asyncWrapper((req, res, next) => {
       next(customError(`Book with id (${id}) does not exist!!!`, 400));
       return;
     }
-    const { bookName, bookAuthor } = book;
-    console.log(bookName);
-    const dataDB = [...JSON.parse(data), book];
-    fs.writeFile("./database.json", JSON.stringify(dataDB), (err) => {
+
+    const newData = JSON.parse(data).map((bk) => {
+      if (bk.id === id) {
+        return {
+          id,
+          Book: bookName,
+          author: bookAuthor,
+        };
+      }
+      return bk;
+    });
+
+    fs.writeFile("./database.json", JSON.stringify(newData), (err) => {
       if (err) {
-        next(customError("Error writing file", 400));
+        next(customError("Error writing file", 500));
         return;
       }
 
@@ -116,6 +129,37 @@ const updateABook = asyncWrapper((req, res, next) => {
   });
 });
 
+// update a single book (method 2)
+const updateABook2 = asyncWrapper((req, res, next) => {
+  const { id } = req.params;
+  fs.readFile("./database.json", "utf8", (err, data) => {
+    if (err) {
+      next(customError(err, 500));
+      return;
+    }
+
+    data = JSON.parse(data);
+    let bookIndex = data.findIndex((index) => index.id === id);
+    if (bookIndex !== -1) {
+      data[bookIndex] = { ...data[bookIndex], ...req.body };
+      fs.writeFile("./database.json", JSON.stringify(data), (err) => {
+        if (err) {
+          next(customError("Error writing file", 500));
+          return;
+        }
+        return res
+          .status(200)
+          .json({ status: "Success", data: data[bookIndex] });
+      });
+    } else {
+      res
+        .status(400)
+        .json({ status: "Error", msg: `Book with id (${id}) does not exist` });
+    }
+  });
+});
+
+// delete a single book by id
 const deleteABook = asyncWrapper((req, res, next) => {
   const { id } = req.params;
   fs.readFile("./database.json", "utf8", (err, data) => {
@@ -146,12 +190,34 @@ const deleteABook = asyncWrapper((req, res, next) => {
   });
 });
 
+// delete all books
 const deleteAllBooks = asyncWrapper((req, res, next) => {
-  fs.unlink("./database.json", (err) => {
+  fs.readFile("./database.json", "utf8", (err, data) => {
     if (err) {
-      next(customError("could not delete file", 500));
+      next(customError(err, 500));
     }
-    res.status(200).json({ status: "success", msg: "File deleted" });
+
+    if (JSON.parse(data).length < 1) {
+      return res.status(200).json({
+        status: "success",
+        msg: "There are no books in the database",
+      });
+    }
+
+    let newArray = [];
+    fs.writeFile("./database.json", JSON.stringify(newArray), (err) => {
+      if (err) {
+        next(customError("Error writing file", 400));
+        return;
+      }
+      res
+        .status(200)
+        .json({
+          status: "Success",
+          msg: "Books deleted successfully",
+          data: newArray,
+        });
+    });
   });
 });
 
@@ -160,6 +226,7 @@ module.exports = {
   createABook,
   getSingleBook,
   updateABook,
+  updateABook2,
   deleteABook,
   deleteAllBooks,
 };
